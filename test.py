@@ -51,9 +51,9 @@ def product_update_webhook():
     # Step 2: Prepare the data for updating destination store products
     updated_data = {
         "product": {
-            "id": product_id,
+            # "id": product_id,
             "title": data['title'],
-            "body_html": data['body_html'],
+            # "body_html": data['body_html'],
             "tags": data['tags'],
             # Add any other fields you want to update
         }
