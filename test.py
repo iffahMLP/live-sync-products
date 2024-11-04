@@ -39,7 +39,7 @@ SOURCE_PASSWORD = store_configs["UK"]["PASSWORD"]
 SOURCE_API_VERSION = store_configs["UK"]["API_VERSION"]
 
 @app.route('/webhook/product-update', methods=['POST'])
-def product_update_webhook(uk_product_id):
+def product_update_webhook():
     data = request.json
     product_id = data['id']  # Shopify ID of the updated product
 
