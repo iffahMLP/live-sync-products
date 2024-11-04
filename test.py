@@ -5,10 +5,7 @@ import os
 
 app = Flask(__name__)
 
-# Load store configurations from JSON file
-with open('MLP.json') as f:
-    STORE_CONFIG = json.load(f)
-
+# Load store configurations
 store_configs = {
     "UK": {
         "SHOP_NAME": os.getenv("UK_SHOP_NAME"),
