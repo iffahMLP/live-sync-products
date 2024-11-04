@@ -81,7 +81,13 @@ def get_product_metafields(store, token, api_key, password, api_version, product
 
     if response.status_code == 200:
         metafields = response.json().get('metafields', [])
-        dest_ids = {mf['key']: mf['value'] for mf in metafields if mf['namespace'] == 'destination_ids'}
+        
+        # Extract destination IDs using split to get the region key
+        dest_ids = {
+            mf['key'].split('_')[0].upper(): mf['value']
+            for mf in metafields
+            if mf['namespace'] == 'custom' and mf['key'].endswith('_product_id')
+        }
         return dest_ids
     else:
         print(f"Failed to fetch metafields: {response.json()}")
