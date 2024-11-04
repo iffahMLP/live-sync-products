@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import requests
 import json
+import os
 
 app = Flask(__name__)
 
@@ -8,12 +9,37 @@ app = Flask(__name__)
 with open('MLP.json') as f:
     STORE_CONFIG = json.load(f)
 
-# Define the source store and token
-SOURCE_STORE = STORE_CONFIG['UK']['Shop Name']
-SOURCE_API_KEY = STORE_CONFIG['UK']['API Key']
-SOURCE_PASSWORD = STORE_CONFIG['UK']['Password']
-SOURCE_API_VERSION = STORE_CONFIG['UK']['API Version']
+store_configs = {
+    "UK": {
+        "SHOP_NAME": os.getenv("UK_SHOP_NAME"),
+        "API_KEY": os.getenv("UK_API_KEY"),
+        "PASSWORD": os.getenv("UK_PASSWORD"),
+        "API_VERSION": os.getenv("UK_API_VERSION")
+    },
+    "US": {
+        "SHOP_NAME": os.getenv("US_SHOP_NAME"),
+        "API_KEY": os.getenv("US_API_KEY"),
+        "PASSWORD": os.getenv("US_PASSWORD"),
+        "API_VERSION": os.getenv("US_API_VERSION")
+    },
+    "EU": {
+        "SHOP_NAME": os.getenv("EU_SHOP_NAME"),
+        "API_KEY": os.getenv("EU_API_KEY"),
+        "PASSWORD": os.getenv("EU_PASSWORD"),
+        "API_VERSION": os.getenv("EU_API_VERSION")
+    },
+    "Duco": {
+        "SHOP_NAME": os.getenv("DUCO_SHOP_NAME"),
+        "API_KEY": os.getenv("DUCO_API_KEY"),
+        "PASSWORD": os.getenv("DUCO_PASSWORD"),
+        "API_VERSION": os.getenv("DUCO_API_VERSION")
+    }
+}
 
+SOURCE_STORE = store_configs["UK"]["SHOP_NAME"]
+SOURCE_API_KEY = store_configs["UK"]["API_KEY"]
+SOURCE_PASSWORD = store_configs["UK"]["PASSWORD"]
+SOURCE_API_VERSION = store_configs["UK"]["API_VERSION"]
 
 @app.route('/webhook/product-update', methods=['POST'])
 def product_update_webhook(uk_product_id):
@@ -37,12 +63,12 @@ def product_update_webhook(uk_product_id):
     }
 
     # Step 3: Update products in the destination stores
-    for region, config in STORE_CONFIG.items():
+    for region, config in store_configs.items():
         if region != 'UK':  # Skip the source store
-            destination_store = config['Shop Name']
-            destination_api_key = config['API Key']
-            destination_password = config['Password']
-            destination_api_version = config['API Version']
+            destination_store = config['SHOP_NAME']
+            destination_api_key = config['API_KEY']
+            destination_password = config['PASSWORD']
+            destination_api_version = config['API_VERSION']
             dest_product_id = metafields.get(region)  # Retrieve the destination product ID
 
             if dest_product_id:
