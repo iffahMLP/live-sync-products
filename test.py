@@ -117,6 +117,9 @@ def product_update_webhook():
                     update_product_in_destination(destination_store, destination_api_key, destination_password, destination_api_version, dest_product_id, updated_data)
 
         return jsonify({"message": f"Product with id {product_id} updates processed successfully"}), 200
+    else:
+        return jsonify({"message": f"No need to update"}), 200
+
     
 
 def get_product_metafields(store, api_key, password, api_version, product_id):
