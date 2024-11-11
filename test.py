@@ -118,7 +118,7 @@ def product_update_webhook():
 
         return jsonify({"message": f"Product with id {product_id} updates processed successfully"}), 200
     else:
-        return jsonify({"message": f"No need to update"}), 200
+        return jsonify({"message": f"No need to update"}), 400
 
     
 
