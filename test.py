@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import requests
 import json
 import os
+from pprint import pprint
 
 app = Flask(__name__)
 
@@ -42,16 +43,20 @@ SOURCE_API_VERSION = store_configs["UK"]["API_VERSION"]
 def product_update_webhook():
     data = request.json
     product_id = data['id']  # Shopify ID of the updated product\
-
-    if product_id == '8098008498397':
+    print(f'Updating for {product_id}')
+    if product_id == 8098008498397:
 
         # Step 1: Get destination product IDs from metafields
-        metafields = get_product_metafields(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION, product_id)
-        if not metafields:
+        metafields_data = get_product_metafields(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION, product_id)
+
+        if metafields_data:
+            destination_ids = metafields_data.get("destination_ids")
+            shipping_label = metafields_data.get("shipping_label")
+        else:
             return jsonify({"message": "No destination IDs found"}), 404
 
 
-        def get_variants_from_destination(store, api_key, password, api_version, product_id):
+        def get_variants_details(store, api_key, password, api_version, product_id):
             shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
             url = f"{shop_url}/products/{product_id}.json"
             response = requests.get(url)
@@ -86,10 +91,9 @@ def product_update_webhook():
             # Update specific fields for variants based on SKU
             if "variants" in data:
                 variants_to_update = []
-                for src_variant in data["variants"]:
-                    print(src_variant)
+                source_variants = get_variants_details(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION, product_id)
+                for src_variant in source_variants:
                     for dest_variant in destination_variants:
-                        print(dest_variant)
                         if src_variant["sku"] == dest_variant["sku"]:
                             updated_variant = {
                                 "id": dest_variant["id"],  # Use destination variant ID for the update
@@ -109,42 +113,140 @@ def product_update_webhook():
                 destination_api_key = config['API_KEY']
                 destination_password = config['PASSWORD']
                 destination_api_version = config['API_VERSION']
-                dest_product_id = metafields.get(region)  # Retrieve the destination product ID
-
+                dest_product_id = destination_ids.get(region)  # Retrieve the destination product ID
+                print(f'{region} product id: {dest_product_id}')
                 if dest_product_id:
-                    destination_variants = get_variants_from_destination(destination_store, destination_api_key, destination_password, destination_api_version, dest_product_id)
+                    destination_variants = get_variants_details(destination_store, destination_api_key, destination_password, destination_api_version, dest_product_id)
                     updated_data = get_data_to_update(region, destination_variants)
                     update_product_in_destination(destination_store, destination_api_key, destination_password, destination_api_version, dest_product_id, updated_data)
+                    update_product_metafield(destination_store, destination_api_key, destination_password, destination_api_version, dest_product_id, shipping_label)
+
 
         return jsonify({"message": f"Product with id {product_id} updates processed successfully"}), 200
     else:
-        return jsonify({"message": f"No need to update"}), 400
-
+        return jsonify({"message": f"No need to update"}), 200
     
 
 def get_product_metafields(store, api_key, password, api_version, product_id):
-    shop_url = "https://%s:%s@%s.myshopify.com/admin/api/%s" % (api_key, password, store, api_version)
+    shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
     url = f"{shop_url}/products/{product_id}/metafields.json"
     response = requests.get(url)
 
     if response.status_code == 200:
         metafields = response.json().get('metafields', [])
         
-        # Extract destination IDs using split to get the region key
+        # Extract specific metafields
         dest_ids = {
             mf['key'].split('_')[0].upper(): mf['value']
             for mf in metafields
             if mf['namespace'] == 'custom' and mf['key'].endswith('_product_id')
         }
-        return dest_ids
+
+        # Look for the shipping_label metafield
+        shipping_label = None
+        for mf in metafields:
+            if mf['namespace'] == 'shipping_information' and mf['key'] == 'shipping_label':
+                shipping_label = mf['value']
+                break  # Stop once the desired metafield is found
+        
+        if shipping_label == None:
+            shipping_label = ""
+        # shipping_metafield = json.dumps({
+        #     "metafield": {
+        #         "namespace": "shipping_information",
+        #         "key": "shipping_label",
+        #         "value": shipping_label,  # Replace with actual value
+        #         "type": "single_line_text_field"
+        #     }
+        # })
+        # print(shipping_metafield)
+        # Return both destination IDs and shipping_label
+        return {
+            "destination_ids": dest_ids,
+            "shipping_label": shipping_label
+        }
     else:
         print(f"Failed to fetch metafields: {response.json()}")
         return None
 
 
+# def update_product_metafield(store, api_key, password, api_version, product_id, metafield_data):
+#     shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
+#     url = f"{shop_url}/products/{product_id}/metafields.json"
+
+#     response = requests.post(url, json=metafield_data)
+#     if response.status_code == 201:  # Status code 201 indicates successful creation
+#         print(f"Metafield 'shipping_label' updated successfully for product {product_id}")
+#     else:
+#         print(f"Failed to update metafield: {response.status_code}, {response.text}")
+
+def update_product_metafield(store, api_key, password, api_version, product_id, shipping_label):
+    shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
+    url = f"{shop_url}/graphql.json"
+    # Construct the GraphQL mutation for updating the product metafield
+    mutation = """
+    mutation updateProductMetafield($input: ProductInput!) {
+      productUpdate(input: $input) {
+        product {
+          id
+          metafields(first: 10) {
+            edges {
+              node {
+                id
+                namespace
+                key
+                value
+              }
+            }
+          }
+        }
+        userErrors {
+          field
+          message
+        }
+      }
+    }
+    """
+    product_gid = f'gid://shopify/Product/{product_id}'
+    # Define the input variables for the mutation
+    product_input = {
+        "input": {
+            "id": product_gid,
+            "metafields": [
+                {
+                    "namespace": "shipping_information",
+                    "key": "shipping_label",
+                    "value": shipping_label,
+                    "type": "single_line_text_field"  # Adjust type if necessary
+                }
+            ]
+        }
+    }
+    # print(product_input)
+    # Send the request
+    response = requests.post(url, json={'query': mutation, 'variables': product_input})
+
+    # Parse and check for errors in the response
+    data = response.json()
+    if 'errors' in data:
+        print("API Error:", data['errors'])
+    else:
+        result = data.get('data', {}).get('productUpdate', {})
+        if result.get('userErrors'):
+            for error in result['userErrors']:
+                print("Error:", error['field'], "-", error['message'])
+        else:
+            metafields = result.get('product', {}).get('metafields', {}).get('edges', [])
+            if metafields:
+                updated_metafield = metafields[-1]['node']
+                # print(metafields)
+                print(f"Metafield updated for {product_id}: Namespace={updated_metafield['namespace']}, Key={updated_metafield['key']}, Value={updated_metafield['value']}")
+
+
 def update_product_in_destination(store, api_key, password, api_version, product_id, updated_data):
     shop_url = "https://%s:%s@%s.myshopify.com/admin/api/%s" % (api_key, password, store, api_version)
     url = f"{shop_url}/products/{product_id}.json"
+    print(f'Updating in {store}: {url}')
     response = requests.put(url, json=updated_data)
 
     if response.status_code == 200:
