@@ -44,8 +44,8 @@ def product_update_webhook():
     data = request.json
     product_id = data['id']  # Shopify ID of the updated product\
     print(f'Updating for {product_id}')
-    if product_id == "--":
-
+    # if product_id == "--":
+    if product_id:
         # Step 1: Get destination product IDs from metafields
         metafields_data = get_product_metafields(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION, product_id)
 
@@ -108,7 +108,7 @@ def product_update_webhook():
                 
         # Step 3: Update products in the destination stores
         for region, config in store_configs.items():
-            if region != 'UK':  # Skip the source store
+            if region != 'UK' and region == 'DUCO':  # Skip the source store
                 destination_store = config['SHOP_NAME']
                 destination_api_key = config['API_KEY']
                 destination_password = config['PASSWORD']
