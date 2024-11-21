@@ -21,7 +21,8 @@ def product_update_webhook():
     product_id = data.get('id')
     print(f"Updating for product ID: {product_id}")
 
-    if not product_id or product_id != 8098008498397:
+    # if not product_id or product_id != 8098008498397:
+    if not product_id:
         return jsonify({"message": "No need to update"}), 200
 
     source_store_url = get_store_url(store_configs['UK'])
@@ -33,7 +34,7 @@ def product_update_webhook():
     shipping_label = metafields_data.get("shipping_label")
 
     for region, config in store_configs.items():
-        if region != "UK":  # Skip source store
+        if region != "UK" and region == 'DUCO':  # Skip source store
             dest_product_id = destination_ids.get(region)
             if dest_product_id:
                 print(f"{region} product ID: {dest_product_id}")
