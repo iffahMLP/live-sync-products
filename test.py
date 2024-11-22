@@ -42,6 +42,9 @@ SOURCE_API_VERSION = store_configs["UK"]["API_VERSION"]
 WEBHOOK_TOPIC = "products/update"
 WEBHOOK_ADDRESS = "https://live-sync-products.onrender.com/webhook/product-update"
 
+# Variable to track if the webhook check has been performed
+webhook_checked = False
+
 def verify_and_create_webhook(store, api_key, password, api_version):
     """Check if the webhook exists, and create it if necessary."""
     shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
@@ -72,12 +75,14 @@ def verify_and_create_webhook(store, api_key, password, api_version):
     else:
         print("Failed to create webhook:", create_response.json())
 
-@app.before_first_request
+@app.before_request
 def ensure_webhook_exists():
     """Ensure the webhook exists before processing any requests."""
-    print("Verifying webhooks...")
-    verify_and_create_webhook(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION)
-
+    global webhook_checked
+    if not webhook_checked:
+        print("Verifying webhooks...")
+        verify_and_create_webhook(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION)
+        webhook_checked = True
 
 @app.route('/webhook/product-update', methods=['POST'])
 def product_update_webhook():
