@@ -39,6 +39,46 @@ SOURCE_API_KEY = store_configs["UK"]["API_KEY"]
 SOURCE_PASSWORD = store_configs["UK"]["PASSWORD"]
 SOURCE_API_VERSION = store_configs["UK"]["API_VERSION"]
 
+WEBHOOK_TOPIC = "products/update"
+WEBHOOK_ADDRESS = "https://live-sync-products.onrender.com/webhook/product-update"
+
+def verify_and_create_webhook(store, api_key, password, api_version):
+    """Check if the webhook exists, and create it if necessary."""
+    shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
+    
+    # Get existing webhooks
+    response = requests.get(f"{shop_url}/webhooks.json")
+    if response.status_code != 200:
+        print("Error fetching webhooks:", response.json())
+        return
+    
+    webhooks = response.json().get("webhooks", [])
+    for webhook in webhooks:
+        if webhook["topic"] == WEBHOOK_TOPIC and webhook["address"] == WEBHOOK_ADDRESS:
+            print("Webhook already exists.")
+            return
+    
+    # Create the webhook if not found
+    payload = {
+        "webhook": {
+            "topic": WEBHOOK_TOPIC,
+            "address": WEBHOOK_ADDRESS,
+            "format": "json"
+        }
+    }
+    create_response = requests.post(f"{shop_url}/webhooks.json", json=payload)
+    if create_response.status_code == 201:
+        print("Webhook created successfully.")
+    else:
+        print("Failed to create webhook:", create_response.json())
+
+@app.before_first_request
+def ensure_webhook_exists():
+    """Ensure the webhook exists before processing any requests."""
+    print("Verifying webhooks...")
+    verify_and_create_webhook(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION)
+
+
 @app.route('/webhook/product-update', methods=['POST'])
 def product_update_webhook():
     data = request.json
