@@ -84,6 +84,7 @@ def ensure_webhook_exists():
         verify_and_create_webhook(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION)
         webhook_checked = True
 
+
 @app.route('/webhook/product-update', methods=['POST'])
 def product_update_webhook():
     data = request.json
