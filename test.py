@@ -3,6 +3,8 @@ import requests
 import json
 import os
 from pprint import pprint
+from apscheduler.schedulers.background import BackgroundScheduler
+
 
 app = Flask(__name__)
 
@@ -45,22 +47,23 @@ WEBHOOK_ADDRESS = "https://live-sync-products.onrender.com/webhook/product-updat
 # Variable to track if the webhook check has been performed
 webhook_checked = False
 
-def verify_and_create_webhook(store, api_key, password, api_version):
+def verify_and_create_webhook():
+    print('checking webhook')
     """Check if the webhook exists, and create it if necessary."""
-    shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
-    
+    shop_url = f"https://{SOURCE_API_KEY}:{SOURCE_PASSWORD}@{SOURCE_STORE}.myshopify.com/admin/api/{SOURCE_API_VERSION}"
+
     # Get existing webhooks
     response = requests.get(f"{shop_url}/webhooks.json")
     if response.status_code != 200:
         print("Error fetching webhooks:", response.json())
         return
-    
+
     webhooks = response.json().get("webhooks", [])
     for webhook in webhooks:
         if webhook["topic"] == WEBHOOK_TOPIC and webhook["address"] == WEBHOOK_ADDRESS:
             print("Webhook already exists.")
             return
-    
+
     # Create the webhook if not found
     payload = {
         "webhook": {
@@ -75,14 +78,10 @@ def verify_and_create_webhook(store, api_key, password, api_version):
     else:
         print("Failed to create webhook:", create_response.json())
 
-@app.before_request
-def ensure_webhook_exists():
-    """Ensure the webhook exists before processing any requests."""
-    global webhook_checked
-    if not webhook_checked:
-        print("Verifying webhooks...")
-        verify_and_create_webhook(SOURCE_STORE, SOURCE_API_KEY, SOURCE_PASSWORD, SOURCE_API_VERSION)
-        webhook_checked = True
+# Periodic webhook verification
+scheduler = BackgroundScheduler()
+scheduler.add_job(verify_and_create_webhook, 'interval', minutes=2)  # Run every 1 minute
+scheduler.start()
 
 
 @app.route('/webhook/product-update', methods=['POST'])
@@ -172,6 +171,31 @@ def product_update_webhook():
     else:
         return jsonify({"message": f"No need to update"}), 200
     
+
+def get_webhooks():
+    """Fetch the list of webhooks from the Shopify store."""
+    base_url = f"https://{SOURCE_API_KEY}:{SOURCE_PASSWORD}@{SOURCE_STORE}.myshopify.com/admin/api/{SOURCE_API_VERSION}"
+    url = f"{base_url}/webhooks.json"
+    
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        webhooks = response.json().get("webhooks", [])
+        
+        if not webhooks:
+            print("No webhooks found.")
+        else:
+            print("List of webhooks:")
+            for webhook in webhooks:
+                if webhook['topic'] == WEBHOOK_TOPIC and webhook['address'] == WEBHOOK_ADDRESS:
+                    print(f"ID: {webhook['id']}, Topic: {webhook['topic']}, Address: {webhook['address']}")
+                    break
+        
+        return webhooks
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching webhooks: {e}")
+        return []
+
 
 def get_product_metafields(store, api_key, password, api_version, product_id):
     shop_url = f"https://{api_key}:{password}@{store}.myshopify.com/admin/api/{api_version}"
