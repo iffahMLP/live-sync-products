@@ -80,7 +80,7 @@ def verify_and_create_webhook():
 
 # Periodic webhook verification
 scheduler = BackgroundScheduler()
-scheduler.add_job(verify_and_create_webhook, 'interval', minutes=2)  # Run every 1 minute
+scheduler.add_job(verify_and_create_webhook, 'interval', minutes=180)  # Run every 1 minute
 scheduler.start()
 
 
@@ -170,31 +170,6 @@ def product_update_webhook():
         return jsonify({"message": f"Product with id {product_id} updates processed successfully"}), 200
     else:
         return jsonify({"message": f"No need to update"}), 200
-    
-
-def get_webhooks():
-    """Fetch the list of webhooks from the Shopify store."""
-    base_url = f"https://{SOURCE_API_KEY}:{SOURCE_PASSWORD}@{SOURCE_STORE}.myshopify.com/admin/api/{SOURCE_API_VERSION}"
-    url = f"{base_url}/webhooks.json"
-    
-    try:
-        response = requests.get(url)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        webhooks = response.json().get("webhooks", [])
-        
-        if not webhooks:
-            print("No webhooks found.")
-        else:
-            print("List of webhooks:")
-            for webhook in webhooks:
-                if webhook['topic'] == WEBHOOK_TOPIC and webhook['address'] == WEBHOOK_ADDRESS:
-                    print(f"ID: {webhook['id']}, Topic: {webhook['topic']}, Address: {webhook['address']}")
-                    break
-        
-        return webhooks
-    except requests.exceptions.RequestException as e:
-        print(f"Error fetching webhooks: {e}")
-        return []
 
 
 def get_product_metafields(store, api_key, password, api_version, product_id):
