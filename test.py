@@ -80,7 +80,7 @@ def verify_and_create_webhook():
 
 # Periodic webhook verification
 scheduler = BackgroundScheduler()
-scheduler.add_job(verify_and_create_webhook, 'interval', minutes=180)  # Run every 1 minute
+scheduler.add_job(verify_and_create_webhook, 'interval', minutes=1)  # Run every 180 minute
 scheduler.start()
 
 
